@@ -23,12 +23,9 @@
 
         // Code formatting
         "esbenp.prettier-vscode",
-        "ms-python.black-formatter",
+        "ms-python.black-formatter"
 
         // Useful utilities
-        "streetsidesoftware.code-spell-checker",
-        "usernamehw.errorlens",
-        "gruntfuggly.todo-tree"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash",

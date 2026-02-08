@@ -2,6 +2,7 @@
 workspace/
 gem5_base/
 gem5/
+m5out/
 # Build artifacts
 build/
 *.o
