@@ -1,0 +1,62 @@
+{
+    "Baseline": {
+        "IPC": 0.86127,
+        "CPI": 1.161076,
+        "Ticks_M": 2746.969947,
+        "Branch_MPKI": 0.9998938738765621,
+        "L2_MPKI": 0.204510951399584,
+        "L1D_MPKI": 0.07333118078402151,
+        "L2_Miss_Rate": 20.04137931034483,
+        "Squashes": 99211.0,
+        "Squashed_Cycles": 0.0,
+        "Idle_Cycles": 50175.0
+    },
+    "Config 1 (LTAGE)": {
+        "IPC": 0.871996,
+        "CPI": 1.146794,
+        "Ticks_M": 2713.179438,
+        "Branch_MPKI": 0.10514086765002702,
+        "L2_MPKI": 0.20268119065065449,
+        "L1D_MPKI": 0.07276817747665859,
+        "L2_Miss_Rate": 19.884009942004973,
+        "Squashes": 7391.0,
+        "Squashed_Cycles": 0.0,
+        "Idle_Cycles": 50338.0
+    },
+    "Config 2 (In-Order)": {
+        "IPC": 0.59331,
+        "CPI": 1.685459,
+        "Ticks_M": 3987.664677,
+        "Branch_MPKI": 0.0,
+        "L2_MPKI": 1328.0,
+        "L1D_MPKI": 360.0,
+        "L2_Miss_Rate": 18.6307519640853,
+        "Squashes": 0.0,
+        "Squashed_Cycles": 0.0,
+        "Idle_Cycles": 0.0
+    },
+    "Config 3 (512k L2)": {
+        "IPC": 0.861589,
+        "CPI": 1.160646,
+        "Ticks_M": 2745.952965,
+        "Branch_MPKI": 0.9997531230497214,
+        "L2_MPKI": 0.20042917742120275,
+        "L1D_MPKI": 0.07178292168877347,
+        "L2_Miss_Rate": 19.649510142127777,
+        "Squashes": 99195.0,
+        "Squashed_Cycles": 0.0,
+        "Idle_Cycles": 48031.0
+    },
+    "Config 4 (Prefetch)": {
+        "IPC": 0.86127,
+        "CPI": 1.161076,
+        "Ticks_M": 2746.969947,
+        "Branch_MPKI": 0.9998938738765621,
+        "L2_MPKI": 0.204510951399584,
+        "L1D_MPKI": 0.07333118078402151,
+        "L2_Miss_Rate": 20.04137931034483,
+        "Squashes": 99211.0,
+        "Squashed_Cycles": 0.0,
+        "Idle_Cycles": 50175.0
+    }
+}

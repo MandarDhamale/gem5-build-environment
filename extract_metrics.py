@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re, os
+import json
 
 def parse_sections(filepath):
     with open(filepath) as f:
@@ -32,44 +33,69 @@ def get(d, *keys, default=0.0):
     return default
 
 configs = {
-    'Baseline':  '/workspace/results/baseline/stats.txt',
-    'Config1':   '/workspace/results/config_1/stats.txt',
-    'Config2':   '/workspace/results/config_2/stats.txt',
-    'Config3a':  '/workspace/results/config_3a/stats.txt',
-    'Config3b':  '/workspace/results/config_3b/stats.txt',
-    'Config4':   '/workspace/results/config_4/stats.txt',
+    'Baseline':  '/workspace/m5out_baseline/stats.txt',
+    'Config 1 (LTAGE)':   '/workspace/m5out_config1/stats.txt',
+    'Config 2 (In-Order)':   '/workspace/m5out_config2/stats.txt',
+    'Config 3 (512k L2)':  '/workspace/m5out_config3/stats.txt',
+    'Config 4 (Prefetch)':   '/workspace/m5out_config4/stats.txt',
 }
 
+results = {}
+
 for name, path in configs.items():
+    if not os.path.exists(path):
+        print(f"Skipping {name}, no stats.txt found at {path}")
+        continue
+    
     secs = parse_sections(path)
-    print("=" * 60)
-    print("=== " + name + " --- " + str(len(secs)) + " sections, ROI section idx 1 ===")
     roi = secs[1] if len(secs) >= 2 else secs[0]
 
+    # Core
     ipc   = get(roi, 'board.processor.cores.core.ipc', 'board.processor.cores.core.commitStats0.ipc')
     cpi   = get(roi, 'board.processor.cores.core.cpi', 'board.processor.cores.core.commitStats0.cpi')
     ticks = get(roi, 'simTicks')
     cycles= get(roi, 'board.processor.cores.core.numCycles')
     insts = get(roi, 'board.processor.cores.core.thread_0.numInsts', 'simInsts')
-
+    kinsts= insts / 1000.0 if insts > 0 else 1.0
+    
+    # Branches
     committed = get(roi, 'board.processor.cores.core.branchPred.committed_0::total')
     mispred   = get(roi, 'board.processor.cores.core.branchPred.mispredicted_0::total')
-    lookups   = get(roi, 'board.processor.cores.core.branchPred.lookups_0::total')
-    cond_wrong= get(roi, 'board.processor.cores.core.branchPred.condIncorrect')
     squashes  = get(roi, 'board.processor.cores.core.branchPred.squashes_0::total')
+    branch_mpki = mispred / kinsts
 
-    bp_rate = (mispred / committed * 100) if committed > 0 else 0.0
+    # Caches
+    l2_demand_misses = get(roi, 'board.cache_hierarchy.l2cache.demandMisses::total', 'board.cache_hierarchy.l2-cache-0.demandMisses::total')
+    l2_demand_accesses = get(roi, 'board.cache_hierarchy.l2cache.demandAccesses::total', 'board.cache_hierarchy.l2-cache-0.demandAccesses::total')
+    l2_miss_rate = (l2_demand_misses / l2_demand_accesses * 100.0) if l2_demand_accesses > 0 else 0.0
+    l2_mpki = l2_demand_misses / kinsts
 
-    l1d = get(roi, 'board.cache_hierarchy.l1d-cache-0.demandMissRate::total')
-    l1i = get(roi, 'board.cache_hierarchy.l1i-cache-0.demandMissRate::total')
-    l2  = get(roi, 'board.cache_hierarchy.l2-cache-0.demandMissRate::total')
+    l1d_demand_misses = get(roi, 'board.cache_hierarchy.dcache.demandMisses::total', 'board.cache_hierarchy.l1d-cache-0.demandMisses::total')
+    l1d_mpki = l1d_demand_misses / kinsts
+    
+    # OoO Stalls
+    squashed_cycles = get(roi, 'board.processor.cores.core.squashedCycles')
+    idle_cycles = get(roi, 'board.processor.cores.core.idleCycles')
 
-    print("  IPC=" + str(round(ipc,4)) + "  CPI=" + str(round(cpi,4)) +
-          "  Ticks=" + str(int(ticks)) + "  Cycles=" + str(int(cycles)) + "  Insts=" + str(int(insts)))
-    print("  BP Committed=" + str(int(committed)) + "  Mispredicted=" + str(int(mispred)) +
-          "  Mispredict%=" + str(round(bp_rate,3)) + "%")
-    print("  CondIncorrect=" + str(int(cond_wrong)) + "  Squashes=" + str(int(squashes)) +
-          "  Lookups=" + str(int(lookups)))
-    print("  L1D miss=" + str(round(l1d*100,3)) + "%  L1I miss=" + str(round(l1i*100,3)) +
-          "%  L2 miss=" + str(round(l2*100,3)) + "%")
-    print("")
+    results[name] = {
+        "IPC": ipc,
+        "CPI": cpi,
+        "Ticks_M": ticks / 1e6,
+        "Branch_MPKI": branch_mpki,
+        "L2_MPKI": l2_mpki,
+        "L1D_MPKI": l1d_mpki,
+        "L2_Miss_Rate": l2_miss_rate,
+        "Squashes": squashes,
+        "Squashed_Cycles": squashed_cycles,
+        "Idle_Cycles": idle_cycles
+    }
+
+    print(f"=== {name} ===")
+    print(f"  IPC: {ipc:.4f} | CPI: {cpi:.4f} | Ticks: {ticks/1e6:.1f}M")
+    print(f"  Branch MPKI: {branch_mpki:.4f} | L2 MPKI: {l2_mpki:.4f} | L1D MPKI: {l1d_mpki:.4f}")
+    print(f"  L2 Miss Rate: {l2_miss_rate:.2f}% | Squashed Cycles: {squashed_cycles}")
+    print()
+
+# Save for graphs
+with open("/workspace/parsed_metrics.json", "w") as f:
+    json.dump(results, f, indent=4)

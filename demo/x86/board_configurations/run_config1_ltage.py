@@ -1,16 +1,7 @@
-"""
-Configuration 1: LTAGE Branch Predictor
-Same as baseline but with LTAGE predictor instead of TournamentBP.
-Hypothesis: LTAGE's longer history tables should better predict the
-recursive branches in Quicksort.
-"""
 import os
-import sys
 from pathlib import Path
 from gem5.components.boards.simple_board import SimpleBoard
-from gem5.components.cachehierarchies.classic.private_l1_private_l2_cache_hierarchy import (
-    PrivateL1PrivateL2CacheHierarchy,
-)
+from gem5.components.cachehierarchies.classic.private_l1_private_l2_cache_hierarchy import PrivateL1PrivateL2CacheHierarchy
 from gem5.components.memory.single_channel import SingleChannelDDR4_2400
 from gem5.resources.resource import BinaryResource
 from gem5.simulate.simulator import Simulator
@@ -22,7 +13,6 @@ from m5.objects import X86O3CPU, LTAGE
 import m5
 
 class LTAGECore(BaseCPUCore):
-    """O3 CPU core with LTAGE branch predictor."""
     def __init__(self):
         core = X86O3CPU()
         core.branchPred = LTAGE()
@@ -45,13 +35,13 @@ board = SimpleBoard(
     cache_hierarchy=cache_hierarchy,
 )
 
-binary_path = Path(__file__).parent.parent.parent / "programs" / "quicksort_10k_x86"
+binary_path = Path(__file__).parent.parent.parent / "programs" / "quicksort_100k_x86"
 board.set_se_binary_workload(binary=BinaryResource(local_path=str(binary_path)))
 
 outdir = m5.options.outdir
 simulator = Simulator(board=board)
 simulator.add_text_stats_output(os.path.join(outdir, "stats.txt"))
 
-print("=== CONFIG 1: O3CPU + LTAGE Branch Predictor + 256kB L2 + n=10,000 ===")
+print("=== CONFIG 1: O3CPU + LTAGE BP + 256kB L2 + n=100k ===")
 simulator.run()
 print("Config 1 simulation complete!")

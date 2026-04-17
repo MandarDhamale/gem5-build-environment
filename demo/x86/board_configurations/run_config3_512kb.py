@@ -11,7 +11,7 @@ from gem5.resources.resource import BinaryResource
 import m5
 
 cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
-    l1d_size="16kB", l1i_size="16kB", l2_size="256kB"
+    l1d_size="16kB", l1i_size="16kB", l2_size="512kB"
 )
 memory = SingleChannelDDR4_2400()
 processor = SimpleProcessor(cpu_type=CPUTypes.O3, isa=ISA.X86, num_cores=1)
@@ -30,6 +30,6 @@ outdir = m5.options.outdir
 simulator = Simulator(board=board)
 simulator.add_text_stats_output(os.path.join(outdir, "stats.txt"))
 
-print("=== BASELINE: O3CPU + TournamentBP + 256kB L2 + n=100k ===")
+print("=== CONFIG 3: O3CPU + 512kB L2 + n=100k ===")
 simulator.run()
-print("Baseline simulation complete!")
+print("Config 3 simulation complete!")

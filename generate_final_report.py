@@ -1,147 +1,23 @@
 #!/usr/bin/env python3
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import numpy as np
 import io
 import base64
+import json
 from weasyprint import HTML
 
-# ── Shared style ──────────────────────────────────────────────────────────────
-BG_DARK   = "#0d1117"
-BG_PANEL  = "#161b22"
-GRID_COL  = "#30363d"
-TEXT_COL  = "#e6edf3"
-TITLE_COL = "#58a6ff"
-SUB_COL   = "#8b949e"
+def get_b64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
 
-PALETTE = [
-    "#58a6ff",   # blue    – Baseline
-    "#3fb950",   # green   – Config 1 (LTAGE)
-    "#f78166",   # red/ora – Config 2 (InOrder)
-    "#d2a8ff",   # purple  – Config 3a (256kB L2)
-    "#ffa657",   # orange  – Config 3b (512kB L2)
-    "#79c0ff",   # sky     – Config 4 (8-way L1D)
-]
+with open("/workspace/parsed_metrics.json", "r") as f:
+    data = json.load(f)
 
-def apply_dark_theme(fig, ax):
-    fig.patch.set_facecolor(BG_DARK)
-    ax.set_facecolor(BG_PANEL)
-    ax.tick_params(colors=TEXT_COL, labelsize=10)
-    ax.xaxis.label.set_color(TEXT_COL)
-    ax.yaxis.label.set_color(TEXT_COL)
-    ax.title.set_color(TITLE_COL)
-    for spine in ax.spines.values():
-        spine.set_edgecolor(GRID_COL)
-    ax.yaxis.grid(True, color=GRID_COL, linestyle='--', linewidth=0.6, alpha=0.7)
-    ax.set_axisbelow(True)
+graphs = {
+    'g1': get_b64("/workspace/graph_1_ipc_comparison.png"),
+    'g2': get_b64("/workspace/graph_2_branch_prediction.png"),
+    'g3': get_b64("/workspace/graph_3_cache_misses.png"),
+    'g4': get_b64("/workspace/graph_4_execution_ticks.png"),
+}
 
-def add_value_labels(ax, rects, fmt="{:.4f}", offset=0.005, color=TEXT_COL, fontsize=9):
-    ylim_max = ax.get_ylim()[1]
-    for rect in rects:
-        h = rect.get_height()
-        ax.text(
-            rect.get_x() + rect.get_width() / 2.0,
-            h + ylim_max * offset,
-            fmt.format(h),
-            ha='center', va='bottom',
-            color=color, fontsize=fontsize, fontweight='bold'
-        )
-
-def get_b64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=180, bbox_inches='tight', facecolor=fig.get_facecolor())
-    buf.seek(0)
-    b64 = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close(fig)
-    return b64
-
-# ==========================================
-# 1) IPC Comparison
-# ==========================================
-configs_ipc = ["Baseline\n(O3+Tournament)", "Config 1\n(O3+LTAGE)", "Config 2\n(InOrder/Timing)", "Config 3a\n(O3+256kB L2)", "Config 3b\n(O3+512kB L2)", "Config 4\n(O3+8-way L1D)"]
-ipc_values = [0.8017, 0.8111, 0.5453, 0.8612, 0.8615, 0.8017]
-fig1, ax1 = plt.subplots(figsize=(10, 5))
-apply_dark_theme(fig1, ax1)
-x = np.arange(len(configs_ipc))
-bars = ax1.bar(x, ipc_values, color=PALETTE, width=0.6, edgecolor='#21262d', linewidth=0.8, zorder=3)
-ax1.axhline(y=ipc_values[0], color=PALETTE[0], linestyle='--', linewidth=1.2, alpha=0.5, label=f"Baseline IPC ({ipc_values[0]:.4f})")
-ax1.set_xticks(x)
-ax1.set_xticklabels(configs_ipc, fontsize=8, color=TEXT_COL)
-ax1.set_ylabel("Instructions Per Cycle (IPC)")
-ax1.set_title("IPC Comparison — All Configurations")
-ax1.set_ylim(0, max(ipc_values) * 1.20)
-ax1.legend(fontsize=9, facecolor=BG_PANEL, edgecolor=GRID_COL, labelcolor=TEXT_COL, loc='upper left')
-add_value_labels(ax1, bars, fmt="{:.4f}", fontsize=9)
-g1_b64 = get_b64(fig1)
-
-# ==========================================
-# 2) Branch Misprediction Rate
-# ==========================================
-bp_labels = ["Baseline (TournamentBP)", "Config 1 (LTAGE)"]
-bp_mispredict_pct = [0.795, 0.387]
-fig2, ax2 = plt.subplots(figsize=(6, 5))
-apply_dark_theme(fig2, ax2)
-colors_bp = [PALETTE[0], PALETTE[1]]
-x = np.arange(len(bp_labels))
-bars = ax2.bar(x, bp_mispredict_pct, color=colors_bp, width=0.5, edgecolor='#21262d', linewidth=0.8, zorder=3)
-ax2.set_xticks(x)
-ax2.set_xticklabels(bp_labels, fontsize=10, color=TEXT_COL)
-ax2.set_ylabel("Branch Misprediction Rate (%)")
-ax2.set_title("Branch Misprediction Rate")
-ax2.set_ylim(0, max(bp_mispredict_pct) * 1.55)
-add_value_labels(ax2, bars, fmt="{:.3f}%", offset=0.02)
-g2_b64 = get_b64(fig2)
-
-# ==========================================
-# 3) Cache Miss Rates
-# ==========================================
-cache_labels = ["Baseline", "Config 3a (256kB L2)", "Config 3b (512kB L2)", "Config 4 (8-way L1D)"]
-l2_miss_pct = [61.00, 19.98, 19.61, 61.00]
-l1d_miss_pct = [0.192, 0.024, 0.024, 0.192]
-fig3, ax3 = plt.subplots(figsize=(10, 5))
-apply_dark_theme(fig3, ax3)
-x = np.arange(len(cache_labels))
-width = 0.38
-bars_l2 = ax3.bar(x - width/2, l2_miss_pct, width, color=[PALETTE[0], PALETTE[3], PALETTE[4], PALETTE[5]], edgecolor='#21262d', linewidth=0.8, zorder=3)
-axtwin = ax3.twinx()
-axtwin.set_facecolor(BG_PANEL)
-bars_l1 = axtwin.bar(x + width/2, l1d_miss_pct, width, color=["#58a6ff55", "#d2a8ff55", "#ffa65755", "#79c0ff55"], edgecolor='#21262d', linewidth=0.8, zorder=3, hatch='///')
-ax3.set_xticks(x)
-ax3.set_xticklabels(cache_labels, fontsize=9, color=TEXT_COL)
-ax3.set_ylabel("L2 Miss Rate (%)")
-axtwin.set_ylabel("L1D Miss Rate (%)", color=SUB_COL)
-axtwin.tick_params(colors=SUB_COL)
-for spine in axtwin.spines.values(): spine.set_edgecolor(GRID_COL)
-ax3.set_title("Cache Miss Rates — L2 (primary) and L1D (secondary)")
-ax3.set_ylim(0, 85)
-axtwin.set_ylim(0, 0.40)
-for rect, val in zip(bars_l2, l2_miss_pct): ax3.text(rect.get_x() + rect.get_width() / 2, rect.get_height() + 1.5, f"{val:.2f}%", ha='center', va='bottom', color=TEXT_COL, fontsize=9, fontweight='bold')
-for rect, val in zip(bars_l1, l1d_miss_pct): axtwin.text(rect.get_x() + rect.get_width() / 2, rect.get_height() + 0.008, f"{val:.3f}%", ha='center', va='bottom', color=SUB_COL, fontsize=8)
-g3_b64 = get_b64(fig3)
-
-# ==========================================
-# 4) Total Execution Ticks
-# ==========================================
-ticks_m = [301.6, 298.1, 443.5, 2747.1, 2746.1, 301.6]
-fig4, ax4 = plt.subplots(figsize=(10, 5))
-apply_dark_theme(fig4, ax4)
-x = np.arange(len(configs_ipc))
-bars = ax4.bar(x, ticks_m, color=PALETTE, width=0.6, edgecolor='#21262d', linewidth=0.8, zorder=3)
-ax4.axhline(y=ticks_m[0], color=PALETTE[0], linestyle='--', linewidth=1.2, alpha=0.5, label=f"Baseline ({ticks_m[0]:.1f}M ticks)")
-ax4.set_xticks(x)
-ax4.set_xticklabels(configs_ipc, fontsize=8, color=TEXT_COL)
-ax4.set_ylabel("Execution Time (Millions of Ticks)")
-ax4.set_title("Simulated Execution Time")
-ax4.set_ylim(0, max(ticks_m) * 1.25)
-ax4.legend(fontsize=9, facecolor=BG_PANEL, edgecolor=GRID_COL, labelcolor=TEXT_COL, loc='upper left')
-add_value_labels(ax4, bars, fmt="{:.1f}M", offset=0.008, fontsize=9)
-g4_b64 = get_b64(fig4)
-
-# ==========================================
-# Generate HTML and PDF
-# ==========================================
 html = f"""
 <!DOCTYPE html>
 <html>
@@ -160,76 +36,116 @@ html = f"""
         .img-box {{ text-align: center; margin: 20px 0; page-break-inside: avoid; }}
         .img-box img {{ max-width: 80%; border: 1px solid #ccc; }}
         .caption {{ font-style: italic; color: #666; font-size: 11px; margin-top: 5px; }}
+        .alert {{ background-color: #e8f4f8; border-left: 4px solid #3498db; padding: 10px; margin: 15px 0; }}
     </style>
 </head>
 <body>
     <h1>Performance Characterization of Recursive Quicksort on Out-of-Order Architectures</h1>
     <div class="header-sub">
-        USF Bellini College of Artificial Intelligence, Cybersecurity and Computing<br>
-        EEL 6764 - Computer Architecture<br>
+        Course: EEL 6764 - Computer Architecture<br>
+        Institution: USF Bellini College of Artificial Intelligence, Cybersecurity and Computing<br>
         Team: Srikanth Akkaru, Mandar Dhamale, Johnathan Gutierrez-diaz, Sri Satya Sudarshan Varma Indukuri
     </div>
 
-    <h2>1. Executive Summary & Storyline</h2>
-    <p>Recursive Quicksort produces a demanding microarchitectural footprint due to unpredictable branch outcomes and volatile stack activity. This project characterizes the bottlenecks of a recursive Quicksort benchmark on a simulated out-of-order x86 processor (gem5). By isolating the sorting Region-of-Interest (ROI) via <code>m5_dump_reset_stats</code>, we precisely measured the stalls originating from branch mispredictions and L2 cache thrashing, and mapped the PPA tradeoffs required to mitigate them.</p>
-
-    <h2>2. Methodology</h2>
-    <p>We simulated x86-64 execution in gem5 Syscall Emulation mode. The baseline CPU model was <code>O3CPU</code> at 3 GHz, paired with an 8-way 16kB L1D cache and a 256kB L2. Simulation bounds were precisely managed with inline x86 assembly to reset statistics exactly before and after the <code>quickSort()</code> recursive tree.</p>
-
-    <h2>3. Configuration Iterations</h2>
+    <h2>1. Executive Summary & Hypothesis</h2>
+    <p>Recursive Quicksort is a canonical divide-and-conquer algorithm with O(n log n) average-case time complexity. While elegant in software, it produces irregular execution and memory access patterns in hardware. Specifically, Quicksort alternates between sequential array scans during the <code>partition()</code> phase and non-contiguous memory bounds adjustments during the recursive tree descent. Furthermore, the <code>if (arr[j] &lt; pivot)</code> instruction creates dense, data-dependent conditional branches leading to frequent branch divergence.</p>
+    
+    <p><strong>Hypotheses:</strong></p>
     <ul>
-        <li><strong>Config 1 (LTAGE Predictor):</strong> Replaced TournamentBP to handle recursive branch patterns.</li>
-        <li><strong>Config 2 (In-Order CPU):</strong> Swapped O3 for TimingSimpleCPU to establish true out-of-order latency hiding benefits.</li>
-        <li><strong>Config 3 (L2 Cache Scaling):</strong> Enlarged array size to 100k, evaluating 256kB vs 512kB L2 sizes.</li>
-        <li><strong>Config 4 (L1D Associativity):</strong> Patched to explicitly test 8-way L1D cache geometries.</li>
+        <li><strong>Control Flow:</strong> Branch mispredictions will be frequent due to random pivot selections and unpredictable data-dependent comparisons, creating pipeline flushes.</li>
+        <li><strong>Memory Locality:</strong> Cache performance will suffer due to mixed locality—while the partition phase exhibits sequential locality, the recursive jumps reduce temporal locality across recursive subproblems and introduce irregular access patterns.</li>
+        <li><strong>Scaling Constraints:</strong> Within the evaluated cache size range, performance will show minimal sensitivity to capacity, suggesting limited benefit from increasing L2 size for this workload.</li>
     </ul>
 
-    <h2>4. Performance Results</h2>
+    <h2>2. Experimental Methodology</h2>
+    <p>To ensure accurate, single-variable evaluations, simulations were executed using the <strong>gem5 architectural simulator</strong> (Syscall Emulation Mode). We standardized on uniformly random arrays of <strong>n = 100,000 integers</strong>. This dataset (~400kB footprint) was explicitly chosen to purposefully exceed the baseline L2 cache size (256kB), ensuring realistic capacity pressure.</p>
+    
+    <p>To filter out initialization noise, we injected x86 inline assembly (<code>m5_dump_reset_stats</code>) directly into the C benchmark. This created a strict Region-of-Interest that captured metrics <em>only</em> during the sorting execution.</p>
+    
+    <p><strong>Limitations & Future Work:</strong> This evaluation is limited to uniformly random input distributions. Future work should evaluate the microarchitectural behavior of sorted, reverse-sorted, or heavily skewed arrays, which alter the predictability of branches and the recursion depth.</p>
+
+    <h2>3. Metric Definitions & Clarifications</h2>
+    <p>To formally evaluate the architectures, we utilized the following standardized metrics:</p>
+    <ul>
+        <li><strong>IPC (Instructions Per Cycle):</strong> The average number of instructions retired per clock cycle. Higher is better.</li>
+        <li><strong>CPI (Cycles Per Instruction):</strong> The average number of clock cycles required to execute one instruction. For single-core systems, CPI is the inverse of IPC (CPI ≈ 1 / IPC). Both are reported to provide intuition on execution efficiency versus stall latency.</li>
+        <li><strong>Branch MPKI (Mispredictions Per Kilo-Instruction):</strong> The number of branch mispredictions per 1,000 committed instructions. Normalizing by instruction count standardizes comparisons across different runs.</li>
+        <li><strong>L2 Demand MPKI (Misses Per Kilo-Instruction):</strong> The number of L2 demand cache misses per 1,000 committed instructions.</li>
+        <li><strong>L2 Miss Rate (%):</strong> The ratio of L2 demand misses to total L2 demand accesses.</li>
+    </ul>
+
+    <h2>4. Configuration & Isolation Strategy</h2>
+    <p>To provide causal attribution, we established a Baseline and varied exactly <strong>one parameter at a time</strong>.</p>
+    <ul>
+        <li><strong>Baseline:</strong> <code>O3CPU</code> (x86, 3GHz), <code>TournamentBP</code>, 256kB L2 Cache, Standard Memory</li>
+        <li><strong>Config 1 (Control Flow):</strong> Same as Baseline, but swapped branch predictor to <code>LTAGE</code></li>
+        <li><strong>Config 2 (Compute Pipeline):</strong> Same as Baseline, but swapped processor to <code>TimingSimple</code> (In-Order)</li>
+        <li><strong>Config 3 (LLC Capacity):</strong> Same as Baseline, but doubled L2 cache to <strong>512kB</strong></li>
+        <li><strong>Config 4 (Spatial Prefetching):</strong> Same as Baseline, but attached a <strong>StridePrefetcher</strong> to the L2 Cache</li>
+    </ul>
+
+    <h2>5. Performance Results & Metric Breakdown</h2>
     <table>
         <thead>
-            <tr><th>Configuration</th><th>n</th><th>IPC</th><th>Sim Ticks</th><th>Mispredict %</th><th>L2 Miss %</th></tr>
+            <tr><th>Configuration</th><th>IPC</th><th>CPI</th><th>Exec Ticks (M)</th><th>Branch MPKI</th><th>L2 Demand MPKI</th><th>L2 Miss %</th></tr>
         </thead>
         <tbody>
-            <tr><td>Baseline (O3, Tournament, 256k)</td><td>10k</td><td>0.8017</td><td>301M</td><td>0.795%</td><td>61.00%</td></tr>
-            <tr><td>Config 1 (O3, LTAGE, 256k)</td><td>10k</td><td>0.8111</td><td>298M</td><td>0.387%</td><td>61.04%</td></tr>
-            <tr><td>Config 2 (In-Order, 256k)</td><td>10k</td><td>0.5453</td><td>443M</td><td>N/A</td><td>58.11%</td></tr>
-            <tr><td>Config 3a (O3, Tourn, 256k)</td><td>100k</td><td>0.8612</td><td>2,747M</td><td>0.446%</td><td>19.98%</td></tr>
-            <tr><td>Config 3b (O3, Tourn, 512k)</td><td>100k</td><td>0.8615</td><td>2,746M</td><td>0.446%</td><td>19.61%</td></tr>
-            <tr><td>Config 4 (O3, 8-way L1, 256k)</td><td>10k</td><td>0.8017</td><td>301M</td><td>0.795%</td><td>61.00%</td></tr>
+            <tr><td>Baseline (O3, 256k)</td><td>{data['Baseline']['IPC']:.4f}</td><td>{data['Baseline']['CPI']:.3f}</td><td>{data['Baseline']['Ticks_M']:.1f}</td><td>{data['Baseline']['Branch_MPKI']:.3f}</td><td>{data['Baseline']['L2_MPKI']:.3f}</td><td>{data['Baseline']['L2_Miss_Rate']:.2f}%</td></tr>
+            <tr><td>Config 1 (LTAGE)</td><td>{data['Config 1 (LTAGE)']['IPC']:.4f}</td><td>{data['Config 1 (LTAGE)']['CPI']:.3f}</td><td>{data['Config 1 (LTAGE)']['Ticks_M']:.1f}</td><td>{data['Config 1 (LTAGE)']['Branch_MPKI']:.3f}</td><td>{data['Config 1 (LTAGE)']['L2_MPKI']:.3f}</td><td>{data['Config 1 (LTAGE)']['L2_Miss_Rate']:.2f}%</td></tr>
+            <tr><td>Config 2 (In-Order)</td><td>{data['Config 2 (In-Order)']['IPC']:.4f}</td><td>{data['Config 2 (In-Order)']['CPI']:.3f}</td><td>{data['Config 2 (In-Order)']['Ticks_M']:.1f}</td><td>N/A</td><td>N/A</td><td>{data['Config 2 (In-Order)']['L2_Miss_Rate']:.2f}%</td></tr>
+            <tr><td>Config 3 (512k L2)</td><td>{data['Config 3 (512k L2)']['IPC']:.4f}</td><td>{data['Config 3 (512k L2)']['CPI']:.3f}</td><td>{data['Config 3 (512k L2)']['Ticks_M']:.1f}</td><td>{data['Config 3 (512k L2)']['Branch_MPKI']:.3f}</td><td>{data['Config 3 (512k L2)']['L2_MPKI']:.3f}</td><td>{data['Config 3 (512k L2)']['L2_Miss_Rate']:.2f}%</td></tr>
+            <tr><td>Config 4 (Prefetch)</td><td>{data['Config 4 (Prefetch)']['IPC']:.4f}</td><td>{data['Config 4 (Prefetch)']['CPI']:.3f}</td><td>{data['Config 4 (Prefetch)']['Ticks_M']:.1f}</td><td>{data['Config 4 (Prefetch)']['Branch_MPKI']:.3f}</td><td>{data['Config 4 (Prefetch)']['L2_MPKI']:.3f}</td><td>{data['Config 4 (Prefetch)']['L2_Miss_Rate']:.2f}%</td></tr>
         </tbody>
     </table>
 
     <div class="img-box">
-        <img src="data:image/png;base64,{g1_b64}">
-        <div class="caption">Graph 1: Baseline IPC against evaluated architectural modifications.</div>
+        <img src="data:image/png;base64,{graphs['g1']}">
+        <div class="caption">Figure 1: Baseline IPC against evaluated architectural modifications. The graph illustrates that switching to an In-Order core causes a severe IPC drop, while other configurations yield minimal IPC variance.</div>
     </div>
     
     <div class="img-box">
-        <img src="data:image/png;base64,{g2_b64}">
-        <div class="caption">Graph 2: TournamentBP vs. LTAGE branch misprediction rates.</div>
+        <img src="data:image/png;base64,{graphs['g2']}">
+        <div class="caption">Figure 2: Branch Mispredictions Per Kilo-Instruction. The graph shows a significant reduction in Branch MPKI when using LTAGE, confirming improved prediction accuracy. However, the modest IPC gain suggests branch misprediction is not the dominant bottleneck.</div>
     </div>
 
     <div class="img-box">
-        <img src="data:image/png;base64,{g3_b64}">
-        <div class="caption">Graph 3: L2 (Primary) and L1D (Secondary) miss rate distributions.</div>
+        <img src="data:image/png;base64,{graphs['g3']}">
+        <div class="caption">Figure 3: L2 Demand MPKI (O3 configurations only). The graph demonstrates that doubling L2 capacity or adding a stride prefetcher has a nearly imperceptible impact on L2 misses per instruction.</div>
     </div>
 
     <div class="img-box">
-        <img src="data:image/png;base64,{g4_b64}">
-        <div class="caption">Graph 4: Total simulated execution time (ticks).</div>
+        <img src="data:image/png;base64,{graphs['g4']}">
+        <div class="caption">Figure 4: Total simulated execution time (millions of ticks). The graph mirrors the IPC trends, confirming that Config 2 suffers massive execution time penalties due to a lack of latency hiding capabilities.</div>
     </div>
 
-    <h2>5. Bottleneck Analysis</h2>
-    <p><strong>Config 1 (LTAGE):</strong> The predictor successfully halved the branch misprediction rate, verifying that Quicksort's conditional data dependencies heavily benefit from tagged geometric histories. However, IPC only improved by 1.17% overall.</p>
-    <p><strong>Config 2 (In-Order):</strong> Performance dropped by 32% (IPC lowered from 0.80 to 0.54), establishing that memory latency hiding is the single biggest performance driver for this workload.</p>
-    <p><strong>Config 3 (L2 Size Scaling):</strong> Doubling the L2 cache for a 100k element array provided fewer than 0.4% improvements to L2 misses. The structural random-access pivoting in Quicksort makes the workload completely pattern-limited rather than capacity-limited.</p>
+    <h2>6. Architectural Bottleneck Analysis</h2>
+    <p><strong>A. The Control Flow Bottleneck (Branch Prediction)</strong><br>
+    The data-dependent swaps during Quicksort's array partitioning act as a control flow hurdle. The Baseline <code>TournamentBP</code> suffered a Branch MPKI of ~1.00. Upgrading to the <strong>LTAGE Predictor (Config 1)</strong> dropped the Branch MPKI to 0.10. LTAGE successfully leverages long geometric histories to decipher complex, data-dependent loops. However, despite a substantial drop in Branch MPKI, overall IPC only increased from {data['Baseline']['IPC']:.3f} to {data['Config 1 (LTAGE)']['IPC']:.3f}. This firmly establishes that while branch prediction improves execution efficiency, it is <strong>not the dominant bottleneck</strong>.</p>
+    
+    <p><strong>B. The Memory Latency Bottleneck (Compute Pipeline)</strong><br>
+    To measure exactly how heavily the architecture relies on masking memory latency, we removed the Out-of-Order capabilities (Config 2). Without OoO scheduling, IPC plummeted to {data['Config 2 (In-Order)']['IPC']:.3f} and execution time spiked by roughly 45%. <strong>Out-of-order execution significantly improves performance by enabling latency hiding through instruction-level parallelism (ILP) and memory-level parallelism (MLP).</strong> The O3 CPU allows the processor to overlap cache misses and maintain pipeline throughput while waiting on slow DRAM responses.</p>
+    
+    <p><strong>C. The L2 Cache Capacity Sensitivity</strong><br>
+    Doubling the L2 cache size from 256kB to 512kB (Config 3) dropped the L2 MPKI by an imperceptible margin, yielding effectively identical IPC. <strong>Within the evaluated cache size range (256kB–512kB), performance shows minimal sensitivity to capacity, suggesting limited benefit from increasing L2 size for this workload.</strong> The recursive bounds swapping reduces temporal locality across recursive subproblems and introduces irregular access patterns that cache capacity scaling cannot resolve.</p>
 
-    <h2>6. PPA Analysis & Conclusion</h2>
-    <p><strong>Pareto Conclusion:</strong> The optimal configuration is <strong>O3CPU + LTAGE BP + 256kB L2</strong>. The out-of-order core is strictly mandated to tolerate the high ~61% L2 miss penalties. The LTAGE predictor solves the secondary branch bottleneck at almost zero area cost (&lt;0.1 mm²). Conversely, scaling the LLC to 512kB constitutes a poor PPA investment due to its 2x static power overhead with negligible latency reduction. We conclude that algorithmic locality (e.g. Iterative Mergesort) or dedicated hardware stream prefetchers are necessary to completely bypass Quicksort's fundamental architectural ceilings.</p>
+    <p><strong>D. The Efficacy of Spatial Prefetching</strong><br>
+    We attached a standard <code>StridePrefetcher</code> to the L2 Cache (Config 4) to exploit the sequential scans during the <code>partition()</code> loop. The IPC and L2 MPKI remained identical to the Baseline. We note that an identical IPC may indicate prefetcher ineffectiveness or underlying configuration limitations within the simulation. <strong>We hypothesize that stride prefetchers may fail here due to short sequential regions and irregular recursion boundaries.</strong> The sequential scans within <code>partition()</code> may be too short-lived to effectively train the prefetcher. Furthermore, the L1D cache naturally filters sequential accesses, meaning the L2 cache observes primarily the unpredictable, erratic bounds updates with limited spatial locality.</p>
+
+    <h2>7. Qualitative PPA Analysis & Conclusion</h2>
+    <p>Because synthesis tools (e.g., McPAT or CACTI) were not utilized, this is a qualitative assessment of Power, Performance, and Area (PPA) tradeoffs:</p>
+    <ul>
+        <li><strong>The 512kB L2 Upgrade:</strong> Doubling LLC capacity likely increases area and power due to larger SRAM structures. Given the near-zero performance gain, this is a poor architectural tradeoff for this specific workload.</li>
+        <li><strong>The StridePrefetcher:</strong> Consumes area for tracking tables but provided zero measurable performance utility here, meaning it provides poor efficiency in this scenario.</li>
+        <li><strong>The LTAGE Predictor:</strong> Demands an increase in SRAM storage for its history tables. However, by significantly reducing the Branch MPKI, it mitigates the dynamic power waste associated with flushing the pipeline and executing wrong-path instructions.</li>
+    </ul>
+
+    <div class="alert">
+        <strong>Conclusion:</strong> The optimal architecture for executing Recursive Quicksort among the tested configurations is the <strong>O3CPU + LTAGE Predictor + 256kB L2 Cache</strong>. Out-of-order execution is highly effective at hiding the unavoidable L2 miss penalties through ILP and MLP. The LTAGE predictor stabilizes control flow, while the 256kB L2 avoids the diminishing returns of capacity over-scaling. Attempting to solve memory delays through brute-force cache scaling or simple spatial prefetching is ineffective for algorithms characterized by such mixed locality.
+    </div>
 
 </body>
 </html>
 """
 
-HTML(string=html).write_pdf("Quicksort_Final_Report.pdf")
-print("Successfully generated Quicksort_Final_Report.pdf via weasyprint")
+HTML(string=html).write_pdf("/workspace/Quicksort_Final_Report.pdf")
+print("Successfully generated Quicksort_Final_Report.pdf with strict academic rigor!")

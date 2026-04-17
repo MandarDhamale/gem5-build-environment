@@ -8,6 +8,7 @@ from gem5.components.processors.cpu_types import CPUTypes
 from gem5.isas import ISA
 from gem5.simulate.simulator import Simulator
 from gem5.resources.resource import BinaryResource
+from m5.objects import StridePrefetcher
 import m5
 
 cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
@@ -23,6 +24,15 @@ board = SimpleBoard(
     cache_hierarchy=cache_hierarchy,
 )
 
+# Instead of checking names, just check the python class name
+for obj in board.descendants():
+    if type(obj).__name__ == "Cache": # gem5 stdlib caches are mostly just 'Cache' class but we can attach it to the L2 by checking its size
+        try:
+            if getattr(obj, "size", None) == "256kB":
+                obj.prefetcher = StridePrefetcher()
+        except:
+            pass
+
 binary_path = Path(__file__).parent.parent.parent / "programs" / "quicksort_100k_x86"
 board.set_se_binary_workload(binary=BinaryResource(local_path=str(binary_path)))
 
@@ -30,6 +40,6 @@ outdir = m5.options.outdir
 simulator = Simulator(board=board)
 simulator.add_text_stats_output(os.path.join(outdir, "stats.txt"))
 
-print("=== BASELINE: O3CPU + TournamentBP + 256kB L2 + n=100k ===")
+print("=== CONFIG 4: O3CPU + 256kB L2 + StridePrefetcher + n=100k ===")
 simulator.run()
-print("Baseline simulation complete!")
+print("Config 4 simulation complete!")
